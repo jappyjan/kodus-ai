@@ -1,16 +1,40 @@
-import { Controller, Get } from '@nestjs/common';
+import {
+    Body,
+    Controller,
+    Get,
+    Inject,
+    Post,
+    UseGuards,
+} from '@nestjs/common';
 
+import {
+    Action,
+    ResourceType,
+} from '@libs/identity/domain/permissions/enums/permissions.enum';
+import {
+    CheckPolicies,
+    PolicyGuard,
+} from '@libs/identity/infrastructure/adapters/services/permissions/policy.guard';
+import { checkPermissions } from '@libs/identity/infrastructure/adapters/services/permissions/policy.handlers';
+import { CreateTeamWithMemberUseCase } from '@libs/organization/application/use-cases/team/create-with-member.use-case';
 import { ListTeamsWithIntegrationsUseCase } from '@libs/organization/application/use-cases/team/list-with-integrations.use-case';
 import { ListTeamsUseCase } from '@libs/organization/application/use-cases/team/list.use-case';
+import { CreateTeamDto } from '@libs/organization/dtos/create-team.dto';
+import { UserRequest } from '@libs/core/infrastructure/config/types/http/user-request.type';
+import { REQUEST } from '@nestjs/core';
 import {
     ApiBearerAuth,
+    ApiCreatedResponse,
     ApiOkResponse,
     ApiOperation,
     ApiTags,
 } from '@nestjs/swagger';
 import { ApiStandardResponses } from '../docs/api-standard-responses.decorator';
 import { ApiArrayResponseDto } from '../dtos/api-response.dto';
-import { TeamListResponseDto } from '../dtos/team-response.dto';
+import {
+    TeamListResponseDto,
+    TeamResponseDto,
+} from '../dtos/team-response.dto';
 
 @ApiTags('Team')
 @ApiBearerAuth('jwt')
@@ -20,6 +44,10 @@ export class TeamController {
     constructor(
         private readonly listTeamsUseCase: ListTeamsUseCase,
         private readonly listTeamsWithIntegrationsUseCase: ListTeamsWithIntegrationsUseCase,
+        private readonly createTeamWithMemberUseCase: CreateTeamWithMemberUseCase,
+
+        @Inject(REQUEST)
+        private readonly request: UserRequest,
     ) {}
 
     @Get('/')
@@ -40,5 +68,30 @@ export class TeamController {
     @ApiOkResponse({ type: ApiArrayResponseDto })
     public async listWithIntegrations() {
         return await this.listTeamsWithIntegrationsUseCase.execute();
+    }
+
+    @Post('/')
+    @UseGuards(PolicyGuard)
+    @CheckPolicies(
+        checkPermissions({
+            action: Action.Create,
+            resource: ResourceType.OrganizationSettings,
+        }),
+    )
+    @ApiOperation({
+        summary: 'Create team',
+        description:
+            'Create an additional team in the authenticated organization and ' +
+            'attach the acting user as its leader, so each team can connect a ' +
+            'different GitHub organization.',
+    })
+    @ApiCreatedResponse({ type: TeamResponseDto })
+    public async createTeam(@Body() body: CreateTeamDto) {
+        const team = await this.createTeamWithMemberUseCase.execute({
+            teamName: body.name,
+            actorUser: this.request.user,
+        });
+
+        return team.toJson();
     }
 }

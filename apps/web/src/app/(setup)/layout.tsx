@@ -52,9 +52,17 @@ export default async function Layout(props: React.PropsWithChildren) {
         redirect("/confirm-email");
     }
 
-    const candidateTeamId = teams?.find(
-        (t: Team) => t.status === TEAM_STATUS.ACTIVE,
-    )?.uuid;
+    const candidateTeamId =
+        // Prefer the team selected in the workspace switcher: with multiple
+        // teams, an already-onboarded team must not kick a still-unonboarded
+        // team out of /setup (and vice versa). Fall back to the first active
+        // team to preserve the original single-team behavior.
+        teams?.find(
+            (t: Team) =>
+                t.uuid === selectedTeamIdFromCookie &&
+                t.status === TEAM_STATUS.ACTIVE,
+        )?.uuid ??
+        teams?.find((t: Team) => t.status === TEAM_STATUS.ACTIVE)?.uuid;
     if (candidateTeamId) {
         const platformConfigs = await getTeamParametersNoCache<{
             configValue: { finishOnboard?: boolean };

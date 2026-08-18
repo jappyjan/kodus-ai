@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Link } from "@components/ui/link";
 import { toast } from "@components/ui/toaster/use-toast";
 import { usePermission } from "@services/permissions/hooks";
@@ -8,11 +9,10 @@ import {
     ActivityIcon,
     ChartColumn,
     LogOutIcon,
+    PlusIcon,
     SettingsIcon,
     UserIcon,
 } from "lucide-react";
-import { useAllTeams } from "src/core/providers/all-teams-context";
-import { useAuth } from "src/core/providers/auth.provider";
 import { Avatar, AvatarFallback } from "src/core/components/ui/avatar";
 import { Button } from "src/core/components/ui/button";
 import {
@@ -25,11 +25,14 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "src/core/components/ui/dropdown-menu";
+import { useAllTeams } from "src/core/providers/all-teams-context";
+import { useAuth } from "src/core/providers/auth.provider";
 import { useSubscriptionStatus } from "src/core/providers/byok.provider";
 import { useSelectedTeamId } from "src/core/providers/selected-team-context";
 import { TEAM_STATUS } from "src/core/types";
 import { isSelfHosted } from "src/core/utils/self-hosted";
 
+import { CreateTeamDialog } from "./create-team-dialog";
 import { VersionInfo } from "./version-info";
 
 export function UserNav() {
@@ -40,12 +43,17 @@ export function UserNav() {
         Action.Update,
         ResourceType.OrganizationSettings,
     );
+    const canCreateTeam = usePermission(
+        Action.Create,
+        ResourceType.OrganizationSettings,
+    );
     const canReadLogs = usePermission(Action.Read, ResourceType.Logs);
     const canReadTokenUsage = usePermission(
         Action.Read,
         ResourceType.TokenUsage,
     );
     const { isBYOK, isTrial, isEnterprise } = useSubscriptionStatus();
+    const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
 
     const handleChangeWorkspace = (teamId: string) => {
         setTeamId(teamId);
@@ -66,65 +74,75 @@ export function UserNav() {
     };
 
     return (
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-                <Button
-                    data-testid="user-nav-trigger"
-                    size="icon-md"
-                    variant="cancel"
-                    className="rounded-full">
-                    <Avatar className="size-full">
-                        {/* TODO: call user's avatar */}
-                        {/* <AvatarImage src="" alt="username" /> */}
-                        {/* TODO: call user's name and get initials */}
-                        <AvatarFallback>
-                            <UserIcon />
-                        </AvatarFallback>
-                    </Avatar>
-                </Button>
-            </DropdownMenuTrigger>
+        <>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        data-testid="user-nav-trigger"
+                        size="icon-md"
+                        variant="cancel"
+                        className="rounded-full">
+                        <Avatar className="size-full">
+                            {/* TODO: call user's avatar */}
+                            {/* <AvatarImage src="" alt="username" /> */}
+                            {/* TODO: call user's name and get initials */}
+                            <AvatarFallback>
+                                <UserIcon />
+                            </AvatarFallback>
+                        </Avatar>
+                    </Button>
+                </DropdownMenuTrigger>
 
-            <DropdownMenuContent className="w-60" align="end">
-                <DropdownMenuLabel className="text-text-primary text-sm font-normal">
-                    {email}
-                </DropdownMenuLabel>
+                <DropdownMenuContent className="w-60" align="end">
+                    <DropdownMenuLabel className="text-text-primary text-sm font-normal">
+                        {email}
+                    </DropdownMenuLabel>
 
-                <DropdownMenuSeparator />
+                    <DropdownMenuSeparator />
 
-                <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+                    <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
 
-                <DropdownMenuRadioGroup
-                    value={teamId}
-                    onValueChange={handleChangeWorkspace}>
-                    {teams.map((team) => (
-                        <DropdownMenuRadioItem
-                            key={team.uuid}
-                            value={team.uuid}
-                            disabled={team.status !== TEAM_STATUS.ACTIVE}>
-                            {team.name}
-                        </DropdownMenuRadioItem>
-                    ))}
-                </DropdownMenuRadioGroup>
+                    <DropdownMenuRadioGroup
+                        value={teamId}
+                        onValueChange={handleChangeWorkspace}>
+                        {teams.map((team) => (
+                            <DropdownMenuRadioItem
+                                key={team.uuid}
+                                value={team.uuid}
+                                disabled={team.status !== TEAM_STATUS.ACTIVE}>
+                                {team.name}
+                            </DropdownMenuRadioItem>
+                        ))}
+                    </DropdownMenuRadioGroup>
 
-                <DropdownMenuSeparator />
-
-                {canEditOrg && (
-                    <Link href="/organization/general">
-                        <DropdownMenuItem leftIcon={<SettingsIcon />}>
-                            Settings
+                    {canCreateTeam && (
+                        <DropdownMenuItem
+                            data-testid="nav-create-team"
+                            leftIcon={<PlusIcon />}
+                            onSelect={() => setIsCreateTeamOpen(true)}>
+                            Create workspace
                         </DropdownMenuItem>
-                    </Link>
-                )}
+                    )}
 
-                {(isEnterprise || isTrial) && canReadLogs && (
-                    <Link href="/user-logs">
-                        <DropdownMenuItem leftIcon={<ActivityIcon />}>
-                            Activity Logs
-                        </DropdownMenuItem>
-                    </Link>
-                )}
+                    <DropdownMenuSeparator />
 
-                {canReadTokenUsage && (
+                    {canEditOrg && (
+                        <Link href="/organization/general">
+                            <DropdownMenuItem leftIcon={<SettingsIcon />}>
+                                Settings
+                            </DropdownMenuItem>
+                        </Link>
+                    )}
+
+                    {(isEnterprise || isTrial) && canReadLogs && (
+                        <Link href="/user-logs">
+                            <DropdownMenuItem leftIcon={<ActivityIcon />}>
+                                Activity Logs
+                            </DropdownMenuItem>
+                        </Link>
+                    )}
+
+                    {canReadTokenUsage && (
                         <Link href="/token-usage">
                             <DropdownMenuItem
                                 data-testid="nav-token-usage"
@@ -134,17 +152,23 @@ export function UserNav() {
                         </Link>
                     )}
 
-                <Link href="/sign-out" replace>
-                    <DropdownMenuItem leftIcon={<LogOutIcon />}>
-                        Sign out
-                    </DropdownMenuItem>
-                </Link>
+                    <Link href="/sign-out" replace>
+                        <DropdownMenuItem leftIcon={<LogOutIcon />}>
+                            Sign out
+                        </DropdownMenuItem>
+                    </Link>
 
-                <DropdownMenuSeparator />
-                <div className="px-2 py-1.5">
-                    <VersionInfo showUpdate={isSelfHosted} />
-                </div>
-            </DropdownMenuContent>
-        </DropdownMenu>
+                    <DropdownMenuSeparator />
+                    <div className="px-2 py-1.5">
+                        <VersionInfo showUpdate={isSelfHosted} />
+                    </div>
+                </DropdownMenuContent>
+            </DropdownMenu>
+
+            <CreateTeamDialog
+                open={isCreateTeamOpen}
+                onOpenChange={setIsCreateTeamOpen}
+            />
+        </>
     );
 }
