@@ -9,7 +9,7 @@ import { PullRequestReviewState } from '@libs/platform/domain/platformIntegratio
 import { NotificationService } from '@libs/notifications/application/notification.service';
 import { PrAuthorRecipientResolver } from '@libs/notifications/application/pr-author-recipient.resolver';
 import { NotificationEvent } from '@libs/notifications/domain/catalog/events';
-// SeverityLevel no longer used — request changes is driven by level classification
+import { SeverityLevel } from '@libs/common/utils/enums/severityLevel.enum';
 import { CodeReviewPipelineContext } from '../context/code-review-pipeline.context';
 
 @Injectable()
@@ -48,9 +48,9 @@ export class RequestChangesOrApproveStage extends BasePipelineStage<CodeReviewPi
             return context;
         }
 
-        // Solicitar mudanças se houver comentários críticos
-        await this.requestChangesIfCritical(
+        await this.requestChangesIfNeeded(
             codeReviewConfig.isRequestChangesActive,
+            codeReviewConfig.suggestionControl?.severityLevelFilter,
             pullRequest.number,
             organizationAndTeamData,
             repository,
@@ -94,10 +94,11 @@ export class RequestChangesOrApproveStage extends BasePipelineStage<CodeReviewPi
     }
 
     /**
-     * Solicita mudanças no PR se houver comentários críticos
+     * Requests changes when a posted finding meets the configured severity.
      */
-    private async requestChangesIfCritical(
+    private async requestChangesIfNeeded(
         isRequestChanges: boolean,
+        minimumSeverity: SeverityLevel | undefined,
         prNumber: number,
         organizationAndTeamData: OrganizationAndTeamData,
         repository: { id: string; name: string },
@@ -108,18 +109,29 @@ export class RequestChangesOrApproveStage extends BasePipelineStage<CodeReviewPi
                 return;
             }
 
-            const criticalComments = lineComments.filter((comment) => {
+            const severityRank: Record<SeverityLevel, number> = {
+                [SeverityLevel.LOW]: 0,
+                [SeverityLevel.MEDIUM]: 1,
+                [SeverityLevel.HIGH]: 2,
+                [SeverityLevel.CRITICAL]: 3,
+            };
+            const configuredMinimumSeverity =
+                minimumSeverity ?? SeverityLevel.LOW;
+            const matchingComments = lineComments.filter((comment) => {
                 const severity =
-                    comment.comment.suggestion?.severity?.toLowerCase();
-                return severity === 'critical';
+                    comment.comment.suggestion?.severity?.toLowerCase() as SeverityLevel;
+                return (
+                    severityRank[severity] >=
+                    severityRank[configuredMinimumSeverity]
+                );
             });
 
-            if (criticalComments.length === 0) {
+            if (matchingComments.length === 0) {
                 return;
             }
 
             this.logger.log({
-                message: `Requesting changes for PR#${prNumber} due to ${criticalComments.length} critical comments`,
+                message: `Requesting changes for PR#${prNumber} due to ${matchingComments.length} findings at or above ${configuredMinimumSeverity}`,
                 context: this.stageName,
             });
 
@@ -127,7 +139,7 @@ export class RequestChangesOrApproveStage extends BasePipelineStage<CodeReviewPi
                 organizationAndTeamData,
                 prNumber,
                 repository,
-                criticalComments,
+                criticalComments: matchingComments,
             });
         } catch (error) {
             this.logger.error({

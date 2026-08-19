@@ -128,6 +128,72 @@ describe('RequestChangesOrApproveStage — review.auto_approved emit', () => {
         expect(notificationService.emit).not.toHaveBeenCalled();
     });
 
+    it('requests changes for every posted finding at the configured minimum severity', async () => {
+        await stage.execute(
+            makeContext({
+                lineComments: [
+                    {
+                        comment: { suggestion: { severity: 'low' } },
+                    },
+                ] as any,
+                codeReviewConfig: {
+                    pullRequestApprovalActive: false,
+                    isRequestChangesActive: true,
+                    suggestionControl: { severityLevelFilter: 'low' },
+                } as any,
+            }),
+        );
+
+        expect(codeManagement.requestChangesPullRequest).toHaveBeenCalledWith(
+            expect.objectContaining({
+                criticalComments: [
+                    expect.objectContaining({
+                        comment: { suggestion: { severity: 'low' } },
+                    }),
+                ],
+            }),
+        );
+    });
+
+    it('defaults the request-changes threshold to low', async () => {
+        await stage.execute(
+            makeContext({
+                lineComments: [
+                    {
+                        comment: { suggestion: { severity: 'low' } },
+                    },
+                ] as any,
+                codeReviewConfig: {
+                    pullRequestApprovalActive: false,
+                    isRequestChangesActive: true,
+                } as any,
+            }),
+        );
+
+        expect(codeManagement.requestChangesPullRequest).toHaveBeenCalledTimes(
+            1,
+        );
+    });
+
+    it('does not request changes for findings below the configured minimum severity', async () => {
+        await stage.execute(
+            makeContext({
+                lineComments: [
+                    {
+                        comment: { suggestion: { severity: 'medium' } },
+                    },
+                ] as any,
+                codeReviewConfig: {
+                    pullRequestApprovalActive: false,
+                    isRequestChangesActive: true,
+                    suggestionControl: { severityLevelFilter: 'high' },
+                } as any,
+            }),
+        );
+
+        expect(codeManagement.requestChangesPullRequest).not.toHaveBeenCalled();
+    });
+
     it('does not emit when PR is already in APPROVED state', async () => {
         codeManagement.getReviewStatusByPullRequest.mockResolvedValueOnce(
             PullRequestReviewState.APPROVED,
