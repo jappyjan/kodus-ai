@@ -70,7 +70,20 @@ export default async function Layout({ children }: React.PropsWithChildren) {
         redirect("/confirm-email");
     }
 
-    if (!teams?.some((team) => team.status === TEAM_STATUS.ACTIVE)) {
+    // Send users to onboarding when there is nothing usable yet. A team
+    // that exists but is not ACTIVE (e.g. an additional workspace that is
+    // still being onboarded, or the only surviving team after a deletion)
+    // must NOT bounce: the finishOnboard check below routes it to /setup
+    // while it still needs onboarding, and lets it through once done —
+    // bouncing here forever is what the /setup <-> app redirect loop was.
+    const hasSelectedTeam =
+        !!selectedTeamIdFromCookie &&
+        !!teams?.some((t) => t.uuid === selectedTeamIdFromCookie);
+
+    if (
+        !hasSelectedTeam &&
+        !teams?.some((team) => team.status === TEAM_STATUS.ACTIVE)
+    ) {
         redirect("/setup");
     }
 

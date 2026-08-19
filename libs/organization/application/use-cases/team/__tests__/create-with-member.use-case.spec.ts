@@ -142,4 +142,45 @@ describe('CreateTeamWithMemberUseCase', () => {
             useCase.execute({ teamName: 'Attraccess', actorUser }),
         ).rejects.toThrow('Failed to create team member');
     });
+
+    it('retries activation when the first update does not persist', async () => {
+        const { useCase, teamService } = buildUseCase();
+        teamService.findById
+            .mockResolvedValueOnce({
+                uuid: 'team-1',
+                name: 'Attraccess',
+                organization: { uuid: 'org-1' },
+                status: STATUS.PENDING,
+            })
+            .mockResolvedValueOnce({
+                uuid: 'team-1',
+                name: 'Attraccess',
+                organization: { uuid: 'org-1' },
+                status: STATUS.ACTIVE,
+            });
+
+        const team = await useCase.execute({
+            teamName: 'Attraccess',
+            actorUser,
+        });
+
+        expect(teamService.update).toHaveBeenCalledTimes(2);
+        expect(team.status).toBe(STATUS.ACTIVE);
+    });
+
+    it('fails loudly when activation never persists', async () => {
+        const { useCase, teamService } = buildUseCase();
+        teamService.findById.mockResolvedValue({
+            uuid: 'team-1',
+            name: 'Attraccess',
+            organization: { uuid: 'org-1' },
+            status: STATUS.PENDING,
+        });
+
+        await expect(
+            useCase.execute({ teamName: 'Attraccess', actorUser }),
+        ).rejects.toThrow('could not be activated');
+
+        expect(teamService.update).toHaveBeenCalledTimes(2);
+    });
 });

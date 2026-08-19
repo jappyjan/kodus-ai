@@ -87,14 +87,43 @@ export class CreateTeamWithMemberUseCase implements IUseCase {
 
         await this.attachActorAsMember(team, actorUser, organizationId);
 
-        await this.teamService.update(
-            { uuid: team.uuid },
-            { status: STATUS.ACTIVE },
+        const activatedTeam = await this.activateTeam(team);
+
+        return activatedTeam;
+    }
+
+    /**
+     * Activate the team and VERIFY the state landed. A team stuck in
+     * PENDING is invisible to the ACTIVE-only guards in the app and was
+     * the source of onboarding redirect loops, so a silent no-op update
+     * gets one retry and a loud error instead of passing unnoticed.
+     */
+    private async activateTeam(team: TeamEntity): Promise<TeamEntity> {
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            await this.teamService.update(
+                { uuid: team.uuid },
+                { status: STATUS.ACTIVE },
+            );
+
+            const updatedTeam = await this.teamService.findById(team.uuid);
+
+            if (updatedTeam?.status === STATUS.ACTIVE) {
+                return updatedTeam;
+            }
+
+            this.logger.error({
+                message: `Team activation attempt ${attempt} did not persist ACTIVE status`,
+                context: CreateTeamWithMemberUseCase.name,
+                metadata: {
+                    teamId: team.uuid,
+                    statusAfter: updatedTeam?.status,
+                },
+            });
+        }
+
+        throw new InternalServerErrorException(
+            'Team was created but could not be activated',
         );
-
-        const updatedTeam = await this.teamService.findById(team.uuid);
-
-        return updatedTeam ?? team;
     }
 
     /**

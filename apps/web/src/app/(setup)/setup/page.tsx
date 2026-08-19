@@ -22,12 +22,16 @@ export default function Setup() {
         return null;
     }
 
-    // The "last step" cookie is per-user, not per-team, so resuming it for a
-    // freshly created additional team would jump into the previous team's
-    // onboarding position. When the org already has an active team and the
-    // selected team has no git connection yet, start that team's onboarding
-    // at the git-connection step. (No active team = first-time signup — keep
-    // the original flow starting at the first step.)
+    // Decide where onboarding continues for the selected team:
+    // - The "last step" cookie is per-user, not per-team, so blindly resuming
+    //   it after creating/deleting workspaces lands on a step that belongs to
+    //   another team's onboarding state.
+    // - If the selected team has no git connection yet, the right place is
+    //   always the git-connection step. Do that when another team is already
+    //   active (adding a workspace) OR when a last-step cookie exists (a
+    //   returning user stranded on a connection-less team, e.g. the only
+    //   surviving workspace after a deletion). Genuine first-time signups
+    //   have neither, so they keep the original flow from the first step.
     const hasActiveTeam = teams.some(
         (team) => team.status === TEAM_STATUS.ACTIVE,
     );
@@ -36,14 +40,14 @@ export default function Setup() {
             connection.category === "CODE_MANAGEMENT" &&
             connection.hasConnection,
     );
+    const lastStep = getCookie(getSetupCookieName(userId)) as
+        string | undefined;
 
-    if (hasActiveTeam && !hasCodeManagementConnection) {
+    if (!hasCodeManagementConnection && (hasActiveTeam || lastStep)) {
         redirect("/setup/connecting-git-tool");
     }
 
     if (userId) {
-        const lastStep = getCookie(getSetupCookieName(userId)) as
-            string | undefined;
         const isValidLastStep = lastStep && getStepByPath(lastStep);
 
         if (isValidLastStep) {
