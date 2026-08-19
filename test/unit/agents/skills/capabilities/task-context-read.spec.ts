@@ -1,4 +1,5 @@
 import { fetchTaskContext } from '@libs/agents/skills/capabilities/task-context-read';
+import { CapabilityResourcePlanService } from '@libs/agents/skills/runtime/capability-resource-plan.service';
 import {
     SkillCapabilityRuntimeConfig,
     ToolCaller,
@@ -45,6 +46,80 @@ function createBaseParams() {
 }
 
 describe('fetchTaskContext capability', () => {
+    it('uses the Linear issue tool instead of unrelated resources', async () => {
+        const callTool: CallToolMock = jest.fn(async (toolName) => {
+            if (toolName === 'get_issue') {
+                return {
+                    result: {
+                        data: {
+                            id: 'issue-890',
+                            identifier: 'ATT-890',
+                            title: 'Guest accounts',
+                            description:
+                                'Create separate guest accounts with TOTP access.',
+                        },
+                    },
+                };
+            }
+
+            return {
+                result: {
+                    data: {
+                        id: 'cycle-1',
+                        title: 'Current cycle',
+                        description: 'An unrelated Linear cycle.',
+                    },
+                },
+            };
+        });
+        const toolCaller: ToolCaller = {
+            callTool,
+            getRegisteredTools: () => [
+                { name: 'list_cycles' },
+                { name: 'get_issue' },
+                { name: 'list_issues' },
+            ],
+            getToolsForLLM: () => [
+                { name: 'list_cycles', parameters: { properties: {} } },
+                {
+                    name: 'get_issue',
+                    parameters: {
+                        required: ['id'],
+                        properties: { id: { type: 'string' } },
+                    },
+                },
+                {
+                    name: 'list_issues',
+                    parameters: {
+                        properties: { query: { type: 'string' } },
+                    },
+                },
+            ],
+        };
+        const seedService = new CapabilityResourcePlanService();
+
+        const result = await fetchTaskContext(
+            toolCaller,
+            createCapabilityRuntime('linear'),
+            {
+                ...createBaseParams(),
+                taskId: 'ATT-890',
+                taskUrl: 'https://linear.app/attraccess/issue/ATT-890',
+            },
+            {
+                getSeedTaskContextTools: async (provider, capability) =>
+                    seedService.getSeedTools(provider, capability),
+            },
+        );
+
+        expect(callTool).toHaveBeenCalledWith('get_issue', { id: 'ATT-890' });
+        expect(result.normalized).toMatchObject({
+            id: 'ATT-890',
+            description: 'Create separate guest accounts with TOTP access.',
+        });
+        expect(callTool).not.toHaveBeenCalledWith('list_cycles', {});
+    });
+
     it('resolves context deterministically and respects seeded boundary', async () => {
         const callTool: CallToolMock = jest.fn().mockResolvedValue({
             result: {

@@ -25,10 +25,8 @@ describe('CapabilityResourcePlanService', () => {
         );
 
         expect(linearTools).toEqual([
-            'LINEAR_GET_LINEAR_ISSUE',
-            'LINEAR_LIST_LINEAR_ISSUES',
-            'LINEAR_LIST_LINEAR_PROJECTS',
-            'LINEAR_LIST_LINEAR_TEAMS',
+            'get_issue',
+            'list_issues',
         ]);
         expect(notionTools).toEqual([
             'NOTION_FETCH_DATA',
@@ -63,10 +61,8 @@ describe('CapabilityResourcePlanService', () => {
             'fetch',
         ]);
         expect(linearTools).toEqual([
-            'LINEAR_GET_LINEAR_ISSUE',
-            'LINEAR_LIST_LINEAR_ISSUES',
-            'LINEAR_LIST_LINEAR_PROJECTS',
-            'LINEAR_LIST_LINEAR_TEAMS',
+            'get_issue',
+            'list_issues',
         ]);
         expect(notionTools).toEqual([
             'NOTION_FETCH_DATA',
