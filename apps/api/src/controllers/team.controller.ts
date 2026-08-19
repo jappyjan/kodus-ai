@@ -1,9 +1,12 @@
 import {
+    BadRequestException,
     Body,
     Controller,
+    Delete,
     Get,
     Inject,
     Post,
+    Query,
     UseGuards,
 } from '@nestjs/common';
 
@@ -17,14 +20,17 @@ import {
 } from '@libs/identity/infrastructure/adapters/services/permissions/policy.guard';
 import { checkPermissions } from '@libs/identity/infrastructure/adapters/services/permissions/policy.handlers';
 import { CreateTeamWithMemberUseCase } from '@libs/organization/application/use-cases/team/create-with-member.use-case';
+import { DeleteTeamUseCase } from '@libs/organization/application/use-cases/team/delete.use-case';
 import { ListTeamsWithIntegrationsUseCase } from '@libs/organization/application/use-cases/team/list-with-integrations.use-case';
 import { ListTeamsUseCase } from '@libs/organization/application/use-cases/team/list.use-case';
 import { CreateTeamDto } from '@libs/organization/dtos/create-team.dto';
+import { TeamQueryDto } from '@libs/organization/dtos/teamId-query.dto';
 import { UserRequest } from '@libs/core/infrastructure/config/types/http/user-request.type';
 import { REQUEST } from '@nestjs/core';
 import {
     ApiBearerAuth,
     ApiCreatedResponse,
+    ApiNoContentResponse,
     ApiOkResponse,
     ApiOperation,
     ApiTags,
@@ -45,6 +51,7 @@ export class TeamController {
         private readonly listTeamsUseCase: ListTeamsUseCase,
         private readonly listTeamsWithIntegrationsUseCase: ListTeamsWithIntegrationsUseCase,
         private readonly createTeamWithMemberUseCase: CreateTeamWithMemberUseCase,
+        private readonly deleteTeamUseCase: DeleteTeamUseCase,
 
         @Inject(REQUEST)
         private readonly request: UserRequest,
@@ -93,5 +100,36 @@ export class TeamController {
         });
 
         return team.toJson();
+    }
+
+    @Delete('/')
+    @UseGuards(PolicyGuard)
+    @CheckPolicies(
+        checkPermissions({
+            action: Action.Delete,
+            resource: ResourceType.OrganizationSettings,
+        }),
+    )
+    @ApiOperation({
+        summary: 'Delete team',
+        description:
+            'Soft-delete an additional team (workspace), disconnecting its git ' +
+            'integration and deactivating its members. The last remaining team ' +
+            'of the organization cannot be deleted.',
+    })
+    @ApiNoContentResponse({ description: 'Team deleted' })
+    public async deleteTeam(@Query() query: TeamQueryDto) {
+        const organizationId = this.request.user?.organization?.uuid;
+
+        if (!organizationId) {
+            throw new BadRequestException(
+                'Organization not found in request',
+            );
+        }
+
+        await this.deleteTeamUseCase.execute({
+            teamId: query.teamId,
+            organizationId,
+        });
     }
 }

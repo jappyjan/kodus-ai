@@ -39,6 +39,7 @@ import { OrganizationOnboardingModule } from '@libs/organization/modules/organiz
 import { OrganizationModule } from '@libs/organization/modules/organization.module';
 import { OrganizationParametersModule } from '@libs/organization/modules/organizationParameters.module';
 import { ParametersModule } from '@libs/organization/modules/parameters.module';
+import { TeamDeletionModule } from '@libs/organization/modules/team-deletion.module';
 import { TeamModule } from '@libs/organization/modules/team.module';
 import { TeamMembersModule } from '@libs/organization/modules/teamMembers.module';
 import { PlatformModule } from '@libs/platform/modules/platform.module';
@@ -126,6 +127,7 @@ import { NotificationController } from './controllers/notification.controller';
         IssuesModule,
         OrganizationModule,
         TeamModule,
+        TeamDeletionModule,
         TeamMembersModule,
         OrganizationParametersModule,
         ParametersModule,

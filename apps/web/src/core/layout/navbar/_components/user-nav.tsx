@@ -11,6 +11,7 @@ import {
     LogOutIcon,
     PlusIcon,
     SettingsIcon,
+    TrashIcon,
     UserIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback } from "src/core/components/ui/avatar";
@@ -33,6 +34,7 @@ import { TEAM_STATUS } from "src/core/types";
 import { isSelfHosted } from "src/core/utils/self-hosted";
 
 import { CreateTeamDialog } from "./create-team-dialog";
+import { DeleteTeamDialog } from "./delete-team-dialog";
 import { VersionInfo } from "./version-info";
 
 export function UserNav() {
@@ -47,6 +49,10 @@ export function UserNav() {
         Action.Create,
         ResourceType.OrganizationSettings,
     );
+    const canDeleteTeam = usePermission(
+        Action.Delete,
+        ResourceType.OrganizationSettings,
+    );
     const canReadLogs = usePermission(Action.Read, ResourceType.Logs);
     const canReadTokenUsage = usePermission(
         Action.Read,
@@ -54,6 +60,7 @@ export function UserNav() {
     );
     const { isBYOK, isTrial, isEnterprise } = useSubscriptionStatus();
     const [isCreateTeamOpen, setIsCreateTeamOpen] = useState(false);
+    const [isDeleteTeamOpen, setIsDeleteTeamOpen] = useState(false);
 
     const handleChangeWorkspace = (teamId: string) => {
         setTeamId(teamId);
@@ -124,6 +131,15 @@ export function UserNav() {
                         </DropdownMenuItem>
                     )}
 
+                    {canDeleteTeam && teams.length > 1 && (
+                        <DropdownMenuItem
+                            data-testid="nav-delete-team"
+                            leftIcon={<TrashIcon />}
+                            onSelect={() => setIsDeleteTeamOpen(true)}>
+                            Delete workspace
+                        </DropdownMenuItem>
+                    )}
+
                     <DropdownMenuSeparator />
 
                     {canEditOrg && (
@@ -168,6 +184,11 @@ export function UserNav() {
             <CreateTeamDialog
                 open={isCreateTeamOpen}
                 onOpenChange={setIsCreateTeamOpen}
+            />
+
+            <DeleteTeamDialog
+                open={isDeleteTeamOpen}
+                onOpenChange={setIsDeleteTeamOpen}
             />
         </>
     );

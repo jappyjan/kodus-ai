@@ -2,7 +2,6 @@
 
 import { createContext, useContext, useState } from "react";
 
-import { TEAM_STATUS } from "../types";
 import { ClientSideCookieHelpers } from "../utils/cookie";
 import { revalidateServerSideTag } from "../utils/revalidate-server-side";
 import { useAllTeams } from "./all-teams-context";
@@ -22,7 +21,12 @@ export const useSelectedTeamId = () => {
     let teamId = context.teamId;
     const team = teams.find((team) => team.uuid === teamId);
 
-    if (!context.teamId || !team || team.status !== TEAM_STATUS.ACTIVE) {
+    if (!context.teamId || !team) {
+        // Fall back to the first team only when nothing is selected or the
+        // selected team no longer exists. A team that exists but is not
+        // ACTIVE (e.g. a freshly created additional team mid-onboarding)
+        // must stay selected — silently swapping to another team makes
+        // setup/integration flows act on the wrong team.
         teamId = teams?.at(0)?.uuid!;
     }
 

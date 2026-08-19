@@ -42,3 +42,22 @@ export const createTeam = async (
         };
     }
 };
+
+export const deleteTeam = async (
+    teamId: string,
+): Promise<{ ok: true } | { error: string }> => {
+    try {
+        await axiosAuthorized.deleted(TEAMS_PATHS.DELETE, {
+            params: { teamId },
+        });
+
+        return { ok: true };
+    } catch (error: any) {
+        return {
+            error:
+                error.response?.data?.message ||
+                error.response?.status ||
+                "Unknown error",
+        };
+    }
+};
